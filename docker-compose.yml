@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: print-template-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: print_template
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./print-template-backend/src/main/resources/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - print-template-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: print-template-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - print-template-network
+
+  backend:
+    build:
+      context: ./print-template-backend
+      dockerfile: Dockerfile
+    container_name: print-template-backend
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mysql
+      - redis
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/print_template?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+    networks:
+      - print-template-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./print-template-frontend
+      dockerfile: Dockerfile
+    container_name: print-template-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - print-template-network
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+  redis-data:
+
+networks:
+  print-template-network:
+    driver: bridge
